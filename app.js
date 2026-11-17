@@ -1,66 +1,75 @@
 (() => {
   'use strict';
 
-  const STORAGE_KEY = 'teacher-call-app-v1';
+  // =====================================================
+  //  선생님 명단 (순서대로 audio 폴더의 call_00 ~ call_10 과 연결)
+  //  - audio: 확장자를 뺀 파일 이름
+  //  - 선생님을 추가/변경할 때는 이 목록만 고치면 됩니다.
+  // =====================================================
+  const TITLE = '선생님 호출';
+  const TEMPLATE = '{name} 선생님 호출입니다';   // mp3가 없을 때 브라우저 TTS가 읽을 문구
+  const AUDIO_DIR = 'audio';
+  const AUDIO_EXT = 'mp3';                       // wav 등이면 여기만 바꾸세요
 
-  const DEFAULTS = {
-    title: '선생님 호출',
-    teachers: [
-      { name: '양장관', role: '물리' },
-      { name: '김희연', role: '정보' },
-      { name: '송창석', role: '수학' },
-      { name: '임하은', role: '음악' },
-      { name: '김은서', role: '생명과학' },
-      { name: '정우철', role: '체육' },
-      { name: '고은화', role: '미술' },
-      { name: '이윤정', role: '국어' },
-      { name: '이은지', role: '역사' },
-      { name: '윤영은', role: '영어' },
-      { name: '진소라', role: '윤리' }
-    ],
-    settings: {
-      template: '{name} 선생님',
-      voiceURI: '',
-      rate: 0.9,
-      volume: 1,
-      repeat: 1,
-      chime: true,
-      pin: '1234'
-    }
+  const TEACHERS = [
+    { name: '양장관', role: '물리',     audio: 'call_00' },
+    { name: '김희연', role: '정보',     audio: 'call_01' },
+    { name: '송창석', role: '수학',     audio: 'call_02' },
+    { name: '임하은', role: '음악',     audio: 'call_03' },
+    { name: '김은서', role: '생명과학', audio: 'call_04' },
+    { name: '정우철', role: '체육',     audio: 'call_05' },
+    { name: '고은화', role: '미술',     audio: 'call_06' },
+    { name: '이윤정', role: '국어',     audio: 'call_07' },
+    { name: '이은지', role: '역사',     audio: 'call_08' },
+    { name: '윤영은', role: '영어',     audio: 'call_09' },
+    { name: '진소라', role: '윤리',     audio: 'call_10' }
+  ];
+
+  // ---------- 기기별 설정 (이 브라우저에만 저장) ----------
+  const STORAGE_KEY = 'teacher-call-settings-v3';
+  const DEFAULT_SETTINGS = {
+    voiceURI: '',
+    rate: 0.9,
+    volume: 1,
+    repeat: 1,
+    chime: true,
+    pin: '1234'
   };
 
-  // ---------- 저장/불러오기 ----------
-  function clone(o) { return JSON.parse(JSON.stringify(o)); }
-
-  function load() {
+  function loadSettings() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const d = JSON.parse(raw);
-        return {
-          title: d.title || DEFAULTS.title,
-          teachers: Array.isArray(d.teachers) ? d.teachers : clone(DEFAULTS.teachers),
-          settings: Object.assign({}, DEFAULTS.settings, d.settings || {})
-        };
-      }
+      if (raw) return Object.assign({}, DEFAULT_SETTINGS, JSON.parse(raw));
     } catch (e) { /* 저장소 사용 불가 시 기본값 */ }
-    return clone(DEFAULTS);
+    return Object.assign({}, DEFAULT_SETTINGS);
   }
 
-  function save() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); return true; }
+  function saveSettings() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); return true; }
     catch (e) { return false; }
   }
 
-  let state = load();
+  let settings = loadSettings();
 
   // ---------- DOM ----------
   const $ = id => document.getElementById(id);
   const grid = $('grid');
   const statusEl = $('status');
-  const titleEl = $('title');
 
-  // ---------- TTS ----------
+  function setStatus(text, cls) {
+    statusEl.textContent = text;
+    statusEl.className = cls || '';
+  }
+
+  function audioUrl(t) {
+    return `${AUDIO_DIR}/${encodeURIComponent(t.audio)}.${AUDIO_EXT}`;
+  }
+
+  function buildText(t) {
+    return TEMPLATE.replace(/\{name\}/g, t.name);
+  }
+
+  // ---------- 소리 ----------
   const synth = window.speechSynthesis;
   let voices = [];
   let busy = false;
@@ -79,17 +88,11 @@
 
   function pickVoice() {
     if (!voices.length) return null;
-    if (state.settings.voiceURI) {
-      const v = voices.find(v => v.voiceURI === state.settings.voiceURI);
+    if (settings.voiceURI) {
+      const v = voices.find(v => v.voiceURI === settings.voiceURI);
       if (v) return v;
     }
-    const ko = getKoreanVoices();
-    return ko[0] || null;
-  }
-
-  function setStatus(text, cls) {
-    statusEl.textContent = text;
-    statusEl.className = cls || '';
+    return getKoreanVoices()[0] || null;
   }
 
   function playChime() {
@@ -100,7 +103,7 @@
         if (!audioCtx) audioCtx = new AC();
         if (audioCtx.state === 'suspended') audioCtx.resume();
         const t0 = audioCtx.currentTime;
-        const vol = Math.min(1, state.settings.volume) * 0.35;
+        const vol = Math.min(1, settings.volume) * 0.35;
         [[880, 0], [659.25, 0.4]].forEach(([freq, offset]) => {
           const osc = audioCtx.createOscillator();
           const gain = audioCtx.createGain();
@@ -118,27 +121,54 @@
     });
   }
 
-  function buildText(name) {
-    const tpl = state.settings.template || '{name} 선생님';
-    return tpl.replace(/\{name\}/g, name);
+  // mp3 재생: 성공하면 true, 파일이 없거나 오류면 false
+  function playMp3(url) {
+    return new Promise(resolve => {
+      let settled = false;
+      const done = ok => { if (!settled) { settled = true; resolve(ok); } };
+      try {
+        const a = new Audio(url);
+        a.volume = Math.min(1, Math.max(0, Number(settings.volume) || 1));
+        a.onended = () => done(true);
+        a.onerror = () => done(false);
+        const p = a.play();
+        if (p && p.catch) p.catch(() => done(false));
+        setTimeout(() => done(true), 20000); // 안전장치
+      } catch (e) { done(false); }
+    });
   }
 
-  function speakOnce(text) {
+  // 대체 수단: 브라우저 TTS
+  function speakTts(text) {
     return new Promise(resolve => {
+      if (!synth) return resolve(false);
       const u = new SpeechSynthesisUtterance(text);
       const v = pickVoice();
       if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = 'ko-KR'; }
-      u.rate = Number(state.settings.rate) || 1;
-      u.volume = Number(state.settings.volume) || 1;
-      u.pitch = 1;
+      u.rate = Number(settings.rate) || 1;
+      u.volume = Math.min(1, Number(settings.volume) || 1);
       let done = false;
-      const finish = () => { if (!done) { done = true; resolve(); } };
-      u.onend = finish;
-      u.onerror = finish;
+      const finish = ok => { if (!done) { done = true; resolve(ok); } };
+      u.onend = () => finish(true);
+      u.onerror = () => finish(false);
       synth.speak(u);
-      // 일부 브라우저에서 onend가 오지 않는 경우 대비
-      setTimeout(finish, 10000);
+      setTimeout(() => finish(true), 10000);
     });
+  }
+
+  async function announce(t) {
+    const times = Math.max(1, Number(settings.repeat) || 1);
+    let useTts = false;
+    for (let i = 0; i < times; i++) {
+      let ok = false;
+      if (!useTts) ok = await playMp3(audioUrl(t));
+      if (!ok) {
+        useTts = true;                       // mp3가 없으면 이후 반복도 TTS로
+        if (synth) synth.cancel();
+        await speakTts(buildText(t));
+      }
+      if (i < times - 1) await new Promise(r => setTimeout(r, 400));
+    }
   }
 
   function releaseBusy() {
@@ -148,46 +178,36 @@
     setStatus('대기 중');
   }
 
-  async function callTeacher(teacher, btn) {
-    if (!synth) {
-      setStatus('이 브라우저는 음성 출력(TTS)을 지원하지 않습니다.', 'warn');
-      return;
-    }
+  async function callTeacher(t, btn) {
     if (busy) return;
     busy = true;
-    busyTimer = setTimeout(releaseBusy, 30000); // 안전장치
+    busyTimer = setTimeout(releaseBusy, 40000); // 안전장치
 
-    synth.cancel();
     document.querySelectorAll('.teacher').forEach(b => { if (b !== btn) b.classList.add('locked'); });
     btn.classList.add('calling');
-    setStatus(`${teacher.name} 선생님을 호출하고 있습니다…`, 'active');
+    setStatus(`${t.name} 선생님을 호출하고 있습니다…`, 'active');
 
     try {
-      if (state.settings.chime) await playChime();
-      const text = buildText(teacher.name);
-      const times = Math.max(1, Number(state.settings.repeat) || 1);
-      for (let i = 0; i < times; i++) {
-        await speakOnce(text);
-        if (i < times - 1) await new Promise(r => setTimeout(r, 400));
-      }
+      if (settings.chime) await playChime();
+      await announce(t);
     } finally {
       releaseBusy();
     }
   }
 
+  // 첫 호출이 느리지 않도록 mp3를 미리 받아 둔다
+  function warmAudioCache() {
+    TEACHERS.forEach((t, i) => {
+      setTimeout(() => { fetch(audioUrl(t)).catch(() => {}); }, 200 * i);
+    });
+  }
+
   // ---------- 화면 렌더링 ----------
   function render() {
-    titleEl.textContent = state.title;
-    document.title = state.title;
+    $('title').textContent = TITLE;
+    document.title = TITLE;
     grid.innerHTML = '';
-    if (!state.teachers.length) {
-      const d = document.createElement('div');
-      d.className = 'empty';
-      d.textContent = '등록된 선생님이 없습니다. 오른쪽 위 ⚙ 에서 추가해 주세요.';
-      grid.appendChild(d);
-      return;
-    }
-    state.teachers.forEach(t => {
+    TEACHERS.forEach(t => {
       const b = document.createElement('button');
       b.className = 'teacher';
       b.type = 'button';
@@ -219,7 +239,7 @@
   $('pinCancel').addEventListener('click', () => pinOverlay.classList.remove('show'));
 
   function submitPin() {
-    if ($('pinInput').value === String(state.settings.pin)) {
+    if ($('pinInput').value === String(settings.pin)) {
       pinOverlay.classList.remove('show');
       openSettings();
     } else {
@@ -233,7 +253,7 @@
   function fillVoiceSelect() {
     const sel = $('setVoice');
     if (!sel) return;
-    const current = state.settings.voiceURI;
+    const current = settings.voiceURI;
     sel.innerHTML = '';
     const auto = document.createElement('option');
     auto.value = '';
@@ -253,86 +273,93 @@
 
     $('voiceHint').textContent = ko.length
       ? ''
-      : '한국어 음성이 설치되어 있지 않습니다. 기기의 음성 설정에서 한국어 TTS를 설치해 주세요.';
+      : '이 기기에는 한국어 TTS 음성이 없습니다. mp3 파일이 모두 있으면 문제없습니다.';
+  }
+
+  // audio 폴더에 call_00 ~ call_10 이 모두 있는지 확인
+  async function checkAudioFiles() {
+    const box = $('audioCheck');
+    box.className = 'audiocheck';
+    if (location.protocol === 'file:') {
+      box.textContent = '파일로 직접 연 상태에서는 mp3 확인이 되지 않습니다. GitHub Pages 주소로 접속해 확인해 주세요.';
+      return;
+    }
+    box.textContent = 'mp3 파일 확인 중…';
+    const results = await Promise.all(TEACHERS.map(async t => {
+      try {
+        const res = await fetch(audioUrl(t), { method: 'HEAD', cache: 'no-cache' });
+        return { t, ok: res.ok };
+      } catch (e) { return { t, ok: false }; }
+    }));
+    const missing = results.filter(r => !r.ok).map(r => `${r.t.name}(${r.t.audio}.${AUDIO_EXT})`);
+    if (!missing.length) {
+      box.className = 'audiocheck ok';
+      box.textContent = `✔ mp3 파일 ${results.length}개 모두 확인되었습니다.`;
+    } else {
+      box.className = 'audiocheck warn';
+      box.textContent = `mp3 없음 ${missing.length}개: ${missing.join(', ')} — ` +
+        '해당 선생님은 브라우저 TTS로 대신 읽습니다. audio 폴더와 파일 이름을 확인해 주세요.';
+    }
   }
 
   function openSettings() {
-    $('setTitle').value = state.title;
-    $('setTeachers').value = state.teachers
-      .map(t => t.role ? `${t.name}, ${t.role}` : t.name).join('\n');
-    $('setTemplate').value = state.settings.template;
-    $('setRate').value = state.settings.rate;
-    $('setVolume').value = state.settings.volume;
-    $('setRepeat').value = String(state.settings.repeat);
-    $('setChime').checked = !!state.settings.chime;
-    $('setPin').value = state.settings.pin;
-    $('rateVal').textContent = state.settings.rate;
-    $('volVal').textContent = state.settings.volume;
+    $('setVolume').value = settings.volume;
+    $('setRate').value = settings.rate;
+    $('setRepeat').value = String(settings.repeat);
+    $('setChime').checked = !!settings.chime;
+    $('setPin').value = settings.pin;
+    $('volVal').textContent = settings.volume;
+    $('rateVal').textContent = settings.rate;
     $('setError').textContent = '';
     fillVoiceSelect();
     settingsOverlay.classList.add('show');
+    checkAudioFiles();
   }
 
-  $('setRate').addEventListener('input', e => { $('rateVal').textContent = e.target.value; });
   $('setVolume').addEventListener('input', e => { $('volVal').textContent = e.target.value; });
+  $('setRate').addEventListener('input', e => { $('rateVal').textContent = e.target.value; });
   $('btnClose').addEventListener('click', () => settingsOverlay.classList.remove('show'));
 
   $('btnTest').addEventListener('click', async () => {
-    if (!synth) { $('setError').textContent = '이 브라우저는 TTS를 지원하지 않습니다.'; return; }
-    // 현재 입력값으로 임시 테스트
-    const backup = clone(state.settings);
-    state.settings.template = $('setTemplate').value || '{name} 선생님';
-    state.settings.voiceURI = $('setVoice').value;
-    state.settings.rate = Number($('setRate').value);
-    state.settings.volume = Number($('setVolume').value);
-    synth.cancel();
-    const sample = (state.teachers[0] && state.teachers[0].name) || '김민수';
-    if ($('setChime').checked) { state.settings.chime = true; await playChime(); }
-    await speakOnce(buildText(sample));
-    state.settings = backup;
+    const t = TEACHERS[0];
+    // 입력 중인 값으로 임시 테스트
+    const backup = Object.assign({}, settings);
+    settings.volume = Number($('setVolume').value);
+    settings.rate = Number($('setRate').value);
+    settings.voiceURI = $('setVoice').value;
+    settings.chime = $('setChime').checked;
+    try {
+      if (settings.chime) await playChime();
+      await announce(t);
+    } finally {
+      settings = backup;
+    }
   });
 
   $('btnSave').addEventListener('click', () => {
-    const teachers = $('setTeachers').value
-      .split('\n')
-      .map(l => l.trim())
-      .filter(Boolean)
-      .map(l => {
-        const idx = l.search(/[,，]/);
-        if (idx === -1) return { name: l, role: '' };
-        return { name: l.slice(0, idx).trim(), role: l.slice(idx + 1).trim() };
-      })
-      .filter(t => t.name);
-
     const pin = $('setPin').value.trim();
     if (!/^\d{4,8}$/.test(pin)) {
       $('setError').textContent = 'PIN은 숫자 4~8자리로 입력해 주세요.';
       return;
     }
+    settings.volume = Number($('setVolume').value);
+    settings.rate = Number($('setRate').value);
+    settings.repeat = Number($('setRepeat').value);
+    settings.chime = $('setChime').checked;
+    settings.voiceURI = $('setVoice').value;
+    settings.pin = pin;
 
-    state.title = $('setTitle').value.trim() || DEFAULTS.title;
-    state.teachers = teachers;
-    state.settings.template = $('setTemplate').value.trim() || '{name} 선생님';
-    state.settings.voiceURI = $('setVoice').value;
-    state.settings.rate = Number($('setRate').value);
-    state.settings.volume = Number($('setVolume').value);
-    state.settings.repeat = Number($('setRepeat').value);
-    state.settings.chime = $('setChime').checked;
-    state.settings.pin = pin;
-
-    if (!save()) {
+    if (!saveSettings()) {
       $('setError').textContent = '저장소를 사용할 수 없어 이번 실행 동안만 적용됩니다.';
     } else {
       settingsOverlay.classList.remove('show');
     }
-    render();
   });
 
   $('btnReset').addEventListener('click', () => {
-    if (!confirm('모든 설정과 선생님 목록을 초기화할까요?')) return;
-    state = clone(DEFAULTS);
-    save();
-    render();
+    if (!confirm('이 기기의 설정을 모두 초기화할까요?')) return;
+    settings = Object.assign({}, DEFAULT_SETTINGS);
+    saveSettings();
     openSettings();
   });
 
@@ -349,11 +376,11 @@
   }, { passive: false });
 
   // ---------- 시작 ----------
-  if (!synth) {
-    setStatus('이 브라우저는 음성 출력(TTS)을 지원하지 않습니다. 최신 Chrome/Edge를 사용해 주세요.', 'warn');
-  } else {
+  if (synth) {
     loadVoices();
     if (typeof synth.onvoiceschanged !== 'undefined') synth.onvoiceschanged = loadVoices;
   }
   render();
+  setStatus('대기 중');
+  warmAudioCache();
 })();
