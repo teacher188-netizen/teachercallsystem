@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>선생님 호출</title>
+<style>
+  :root {
+    --bg: #f4f7fb;
+    --card: #ffffff;
+    --primary: #2f6fed;
+    --primary-dark: #1f55c4;
+    --accent: #ff9f1a;
+    --text: #1d2433;
+    --muted: #6b7587;
+    --danger: #d64545;
+    --radius: 22px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font-family: "Pretendard", "Noto Sans KR", "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+    overflow: hidden;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 32px 8px;
+  }
+  header h1 { margin: 0; font-size: clamp(28px, 4vw, 48px); letter-spacing: -0.02em; }
+  header p { margin: 4px 0 0; color: var(--muted); font-size: clamp(16px, 2vw, 22px); }
+  #gear {
+    width: 52px; height: 52px; border-radius: 50%;
+    border: none; background: transparent; color: #b6bdcb;
+    font-size: 28px; cursor: pointer;
+  }
+  #gear:active { background: #e5e9f1; }
+
+  main { flex: 1; overflow-y: auto; padding: 16px 32px 24px; }
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 20px;
+  }
+  .teacher {
+    background: var(--card);
+    border: none;
+    border-radius: var(--radius);
+    padding: 28px 12px;
+    min-height: 130px;
+    box-shadow: 0 4px 14px rgba(30, 50, 100, .10);
+    cursor: pointer;
+    font-family: inherit;
+    color: var(--text);
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px;
+    transition: transform .08s ease, box-shadow .08s ease, background .15s;
+  }
+  .teacher .name { font-size: clamp(26px, 3.2vw, 40px); font-weight: 700; letter-spacing: -0.02em; }
+  .teacher .role { font-size: clamp(15px, 1.6vw, 20px); color: var(--muted); }
+  .teacher:active { transform: scale(.96); box-shadow: 0 2px 6px rgba(30,50,100,.15); }
+  .teacher.calling {
+    background: var(--primary);
+    color: #fff;
+    animation: pulse 1s ease-in-out infinite;
+  }
+  .teacher.calling .role { color: #dbe6ff; }
+  .teacher.locked { opacity: .45; pointer-events: none; }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(47,111,237,.5); }
+    50% { box-shadow: 0 0 0 18px rgba(47,111,237,0); }
+  }
+
+  #status {
+    min-height: 64px;
+    padding: 14px 32px;
+    background: #fff;
+    border-top: 1px solid #e3e8f0;
+    font-size: clamp(18px, 2.4vw, 28px);
+    text-align: center;
+    color: var(--muted);
+  }
+  #status.active { color: var(--primary-dark); font-weight: 700; }
+  #status.warn { color: var(--danger); }
+
+  .empty { text-align: center; color: var(--muted); font-size: 22px; padding: 60px 0; }
+
+  /* 모달 */
+  .overlay {
+    position: fixed; inset: 0; background: rgba(15, 25, 50, .55);
+    display: none; align-items: center; justify-content: center; padding: 16px; z-index: 10;
+  }
+  .overlay.show { display: flex; }
+  .modal {
+    background: #fff; border-radius: 20px; width: min(640px, 100%);
+    max-height: 92vh; overflow-y: auto; padding: 24px;
+    -webkit-user-select: text; user-select: text;
+  }
+  .modal h2 { margin: 0 0 16px; font-size: 24px; }
+  .modal label { display: block; margin: 14px 0 6px; font-weight: 600; font-size: 15px; }
+  .modal input[type=text], .modal input[type=password], .modal textarea, .modal select {
+    width: 100%; padding: 12px; font-size: 16px; font-family: inherit;
+    border: 1px solid #cfd6e4; border-radius: 10px;
+  }
+  .modal textarea { min-height: 170px; resize: vertical; line-height: 1.5; }
+  .modal input[type=range] { width: 100%; }
+  .row { display: flex; align-items: center; gap: 12px; }
+  .row > * { flex: 1; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 4px; font-weight: 400; }
+  .btns { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
+  .btn {
+    padding: 13px 20px; border: none; border-radius: 12px; font-size: 16px; font-weight: 700;
+    cursor: pointer; font-family: inherit; background: #e8ecf4; color: var(--text);
+  }
+  .btn.primary { background: var(--primary); color: #fff; }
+  .btn.danger { background: #fdeaea; color: var(--danger); }
+  .btn:active { filter: brightness(.92); }
+  .check { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-weight: 600; }
+  .check input { width: 22px; height: 22px; }
+  .error { color: var(--danger); margin-top: 8px; font-size: 14px; min-height: 18px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1 id="title">선생님 호출</h1>
+    <p>찾으시는 선생님 이름을 눌러 주세요</p>
+  </div>
+  <button id="gear" aria-label="관리자 설정">⚙</button>
+</header>
+
+<main>
+  <div id="grid"></div>
+</main>
+
+<div id="status">대기 중</div>
+
+<!-- PIN 입력 -->
+<div class="overlay" id="pinOverlay">
+  <div class="modal" style="width:min(380px,100%)">
+    <h2>관리자 확인</h2>
+    <label for="pinInput">PIN 번호</label>
+    <input type="password" id="pinInput" inputmode="numeric" autocomplete="off">
+    <div class="error" id="pinError"></div>
+    <div class="btns">
+      <button class="btn primary" id="pinOk">확인</button>
+      <button class="btn" id="pinCancel">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- 설정 -->
+<div class="overlay" id="settingsOverlay">
+  <div class="modal">
+    <h2>설정</h2>
+
+    <label for="setTitle">화면 제목</label>
+    <input type="text" id="setTitle">
+
+    <label for="setTeachers">선생님 목록
+      <div class="hint">한 줄에 한 명, "이름, 담당(선택)" 형식으로 입력하세요. 예) 김민수, 국어</div>
+    </label>
+    <textarea id="setTeachers"></textarea>
+
+    <label for="setTemplate">음성 문구
+      <div class="hint">{name} 자리에 선생님 이름이 들어갑니다. 예) {name} 선생님, 교무실로 와 주세요</div>
+    </label>
+    <input type="text" id="setTemplate">
+
+    <label for="setVoice">음성</label>
+    <select id="setVoice"></select>
+    <div class="hint" id="voiceHint"></div>
+
+    <label>속도 <span id="rateVal"></span></label>
+    <input type="range" id="setRate" min="0.5" max="1.5" step="0.1">
+
+    <label>볼륨 <span id="volVal"></span></label>
+    <input type="range" id="setVolume" min="0.1" max="1" step="0.1">
+
+    <label for="setRepeat">반복 횟수</label>
+    <select id="setRepeat">
+      <option value="1">1회</option>
+      <option value="2">2회</option>
+      <option value="3">3회</option>
+    </select>
+
+    <div class="check">
+      <input type="checkbox" id="setChime">
+      <label for="setChime" style="margin:0">호출 전 알림음(딩동) 재생</label>
+    </div>
+
+    <label for="setPin">관리자 PIN 변경 (숫자)</label>
+    <input type="text" id="setPin" inputmode="numeric" maxlength="8">
+
+    <div class="error" id="setError"></div>
+
+    <div class="btns">
+      <button class="btn" id="btnTest">음성 테스트</button>
+      <button class="btn primary" id="btnSave">저장</button>
+      <button class="btn" id="btnClose">닫기</button>
+      <button class="btn danger" id="btnReset" style="margin-left:auto">초기화</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
