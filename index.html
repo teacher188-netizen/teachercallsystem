@@ -14,6 +14,7 @@
     --text: #1d2433;
     --muted: #6b7587;
     --danger: #d64545;
+    --ok: #1f8f4e;
     --radius: 22px;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -91,8 +92,6 @@
   #status.active { color: var(--primary-dark); font-weight: 700; }
   #status.warn { color: var(--danger); }
 
-  .empty { text-align: center; color: var(--muted); font-size: 22px; padding: 60px 0; }
-
   /* 모달 */
   .overlay {
     position: fixed; inset: 0; background: rgba(15, 25, 50, .55);
@@ -100,21 +99,18 @@
   }
   .overlay.show { display: flex; }
   .modal {
-    background: #fff; border-radius: 20px; width: min(640px, 100%);
+    background: #fff; border-radius: 20px; width: min(600px, 100%);
     max-height: 92vh; overflow-y: auto; padding: 24px;
     -webkit-user-select: text; user-select: text;
   }
-  .modal h2 { margin: 0 0 16px; font-size: 24px; }
+  .modal h2 { margin: 0 0 8px; font-size: 24px; }
   .modal label { display: block; margin: 14px 0 6px; font-weight: 600; font-size: 15px; }
-  .modal input[type=text], .modal input[type=password], .modal textarea, .modal select {
+  .modal input[type=text], .modal input[type=password], .modal select {
     width: 100%; padding: 12px; font-size: 16px; font-family: inherit;
     border: 1px solid #cfd6e4; border-radius: 10px;
   }
-  .modal textarea { min-height: 170px; resize: vertical; line-height: 1.5; }
   .modal input[type=range] { width: 100%; }
-  .row { display: flex; align-items: center; gap: 12px; }
-  .row > * { flex: 1; }
-  .hint { color: var(--muted); font-size: 13px; margin-top: 4px; font-weight: 400; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 4px; font-weight: 400; line-height: 1.5; }
   .btns { display: flex; gap: 10px; margin-top: 22px; flex-wrap: wrap; }
   .btn {
     padding: 13px 20px; border: none; border-radius: 12px; font-size: 16px; font-weight: 700;
@@ -126,6 +122,12 @@
   .check { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-weight: 600; }
   .check input { width: 22px; height: 22px; }
   .error { color: var(--danger); margin-top: 8px; font-size: 14px; min-height: 18px; }
+  .audiocheck {
+    margin: 10px 0 4px; padding: 12px 14px; border-radius: 12px;
+    background: #f1f4fa; font-size: 14px; line-height: 1.6;
+  }
+  .audiocheck.ok { color: var(--ok); }
+  .audiocheck.warn { color: var(--danger); }
 </style>
 </head>
 <body>
@@ -162,26 +164,9 @@
 <div class="overlay" id="settingsOverlay">
   <div class="modal">
     <h2>설정</h2>
+    <div class="hint">선생님 명단은 app.js 맨 위의 TEACHERS 목록에서 수정합니다. 아래 설정은 이 기기(브라우저)에만 저장됩니다.</div>
 
-    <label for="setTitle">화면 제목</label>
-    <input type="text" id="setTitle">
-
-    <label for="setTeachers">선생님 목록
-      <div class="hint">한 줄에 한 명, "이름, 담당(선택)" 형식으로 입력하세요. 예) 김민수, 국어</div>
-    </label>
-    <textarea id="setTeachers"></textarea>
-
-    <label for="setTemplate">음성 문구
-      <div class="hint">{name} 자리에 선생님 이름이 들어갑니다. 예) {name} 선생님, 교무실로 와 주세요</div>
-    </label>
-    <input type="text" id="setTemplate">
-
-    <label for="setVoice">음성</label>
-    <select id="setVoice"></select>
-    <div class="hint" id="voiceHint"></div>
-
-    <label>속도 <span id="rateVal"></span></label>
-    <input type="range" id="setRate" min="0.5" max="1.5" step="0.1">
+    <div class="audiocheck" id="audioCheck">mp3 파일 확인 중…</div>
 
     <label>볼륨 <span id="volVal"></span></label>
     <input type="range" id="setVolume" min="0.1" max="1" step="0.1">
@@ -198,16 +183,23 @@
       <label for="setChime" style="margin:0">호출 전 알림음(딩동) 재생</label>
     </div>
 
-    <label for="setPin">관리자 PIN 변경 (숫자)</label>
+    <label for="setVoice">대체 음성 (mp3가 없을 때만 사용)</label>
+    <select id="setVoice"></select>
+    <div class="hint" id="voiceHint"></div>
+
+    <label>대체 음성 속도 <span id="rateVal"></span></label>
+    <input type="range" id="setRate" min="0.5" max="1.5" step="0.1">
+
+    <label for="setPin">관리자 PIN 변경 (숫자 4~8자리)</label>
     <input type="text" id="setPin" inputmode="numeric" maxlength="8">
 
     <div class="error" id="setError"></div>
 
     <div class="btns">
-      <button class="btn" id="btnTest">음성 테스트</button>
+      <button class="btn" id="btnTest">첫 번째 선생님 테스트</button>
       <button class="btn primary" id="btnSave">저장</button>
       <button class="btn" id="btnClose">닫기</button>
-      <button class="btn danger" id="btnReset" style="margin-left:auto">초기화</button>
+      <button class="btn danger" id="btnReset" style="margin-left:auto">설정 초기화</button>
     </div>
   </div>
 </div>
